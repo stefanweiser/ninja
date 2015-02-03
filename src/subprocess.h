@@ -49,26 +49,42 @@ struct Subprocess {
   bool Done() const;
 
   const std::string& GetOutput() const;
+  const std::string& GetError() const;
 
  private:
   Subprocess(bool use_console);
   bool Start(struct SubprocessSet* set, const std::string& command);
-  void OnPipeReady();
-
-  std::string buf_;
 
 #ifdef _WIN32
+  struct Pipe {
+    HANDLE handle = NULL;
+    OVERLAPPED overlapped{};
+    char overlapped_buf[4 << 10];
+    bool is_reading = false;
+    Subprocess * subprocess;
+    std::string buf;
+  };
+
   /// Set up pipe_ as the parent-side pipe of the subprocess; return the
   /// other end of the pipe, usable in the child process.
-  HANDLE SetupPipe(HANDLE ioport);
+  HANDLE SetupPipe(HANDLE ioport, Pipe & pipe, bool out);
 
   HANDLE child_;
-  HANDLE pipe_;
-  OVERLAPPED overlapped_;
-  char overlapped_buf_[4 << 10];
-  bool is_reading_;
+  Pipe out_;
+  Pipe err_;
+
+  void OnPipeReady(Pipe & pipe);
 #else
-  int fd_;
+  struct Pipe {
+    Pipe() : fd(-1) {}
+    int fd;
+    std::string buf;
+  };
+
+  void OnPipeReady(Pipe & pipe);
+
+  Pipe out_;
+  Pipe err_;
   pid_t pid_;
 #endif
   bool use_console_;

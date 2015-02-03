@@ -29,12 +29,13 @@ using namespace std;
 StatusPrinter::StatusPrinter(const BuildConfig& config)
     : config_(config),
       started_edges_(0), finished_edges_(0), total_edges_(0), running_edges_(0),
-      time_millis_(0), progress_status_format_(NULL),
+      time_millis_(0), printer_(true), err_printer_(false), progress_status_format_(NULL),
       current_rate_(config.parallelism) {
 
   // Don't do anything fancy in verbose mode.
   if (config_.verbosity != BuildConfig::NORMAL)
     printer_.set_smart_terminal(false);
+    err_printer_.set_smart_terminal(false);
 
   progress_status_format_ = getenv("NINJA_STATUS");
   if (!progress_status_format_)
@@ -52,25 +53,29 @@ void StatusPrinter::BuildEdgeStarted(const Edge* edge,
   time_millis_ = start_time_millis;
 
   if (edge->use_console() || printer_.is_smart_terminal())
-    PrintStatus(edge, start_time_millis);
+    PrintStatus(edge, start_time_millis, printer_);
 
-  if (edge->use_console())
+  if (edge->use_console()) {
     printer_.SetConsoleLocked(true);
+    err_printer_.SetConsoleLocked(true);
+  }
 }
 
 void StatusPrinter::BuildEdgeFinished(Edge* edge, int64_t end_time_millis,
-                                      bool success, const string& output) {
+                                      bool success, const string& output, const std::string& error) {
   time_millis_ = end_time_millis;
   ++finished_edges_;
 
-  if (edge->use_console())
+  if (edge->use_console()) {
     printer_.SetConsoleLocked(false);
+    err_printer_.SetConsoleLocked(false);
+  }
 
   if (config_.verbosity == BuildConfig::QUIET)
     return;
 
   if (!edge->use_console())
-    PrintStatus(edge, end_time_millis);
+    PrintStatus(edge, end_time_millis, printer_);
 
   --running_edges_;
 
@@ -81,13 +86,19 @@ void StatusPrinter::BuildEdgeFinished(Edge* edge, int64_t end_time_millis,
          o != edge->outputs_.end(); ++o)
       outputs += (*o)->path() + " ";
 
-    if (printer_.supports_color()) {
-        printer_.PrintOnNewLine("\x1B[31m" "FAILED: " "\x1B[0m" + outputs + "\n");
+    if (err_printer_.supports_color()) {
+        err_printer_.PrintOnNewLine("\x1B[31m" "FAILED: " "\x1B[0m" + outputs + "\n");
     } else {
-        printer_.PrintOnNewLine("FAILED: " + outputs + "\n");
+        err_printer_.PrintOnNewLine("FAILED: " + outputs + "\n");
     }
-    printer_.PrintOnNewLine(edge->EvaluateCommand() + "\n");
+    err_printer_.PrintOnNewLine(edge->EvaluateCommand() + "\n");
   }
+
+  PrintOutput(output, printer_);
+  PrintOutput(error, err_printer_);
+}
+
+void StatusPrinter::PrintOutput(const string& output, LinePrinter& printer) {
 
   if (!output.empty()) {
     // ninja sets stdout and stderr of subprocesses to a pipe, to be able to
@@ -102,7 +113,7 @@ void StatusPrinter::BuildEdgeFinished(Edge* edge, int64_t end_time_millis,
     // only a few hundred available on some systems, and ninja can launch
     // thousands of parallel compile commands.)
     string final_output;
-    if (!printer_.supports_color())
+    if (!printer.supports_color())
       final_output = StripAnsiEscapeCodes(output);
     else
       final_output = output;
@@ -112,7 +123,7 @@ void StatusPrinter::BuildEdgeFinished(Edge* edge, int64_t end_time_millis,
     _setmode(_fileno(stdout), _O_BINARY);  // Begin Windows extra CR fix
 #endif
 
-    printer_.PrintOnNewLine(final_output);
+    printer.PrintOnNewLine(final_output);
 
 #ifdef _WIN32
     _setmode(_fileno(stdout), _O_TEXT);  // End Windows extra CR fix
@@ -227,7 +238,7 @@ string StatusPrinter::FormatProgressStatus(const char* progress_status_format,
   return out;
 }
 
-void StatusPrinter::PrintStatus(const Edge* edge, int64_t time_millis) {
+void StatusPrinter::PrintStatus(const Edge* edge, int64_t time_millis, LinePrinter& printer) {
   if (config_.verbosity == BuildConfig::QUIET
       || config_.verbosity == BuildConfig::NO_STATUS_UPDATE)
     return;
@@ -241,7 +252,7 @@ void StatusPrinter::PrintStatus(const Edge* edge, int64_t time_millis) {
   to_print = FormatProgressStatus(progress_status_format_, time_millis)
       + to_print;
 
-  printer_.Print(to_print,
+  printer.Print(to_print,
                  force_full_command ? LinePrinter::FULL : LinePrinter::ELIDE);
 }
 

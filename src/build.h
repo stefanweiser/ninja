@@ -144,6 +144,7 @@ struct CommandRunner {
     Edge* edge;
     ExitStatus status;
     std::string output;
+    std::string error;
     bool success() const { return status == ExitSuccess; }
   };
   /// Wait for a command to complete, or return false if interrupted.

@@ -16,12 +16,13 @@
 #define NINJA_LINE_PRINTER_H_
 
 #include <stddef.h>
+#include <stdio.h>
 #include <string>
 
 /// Prints lines of text, possibly overprinting previously printed lines
 /// if the terminal supports it.
 struct LinePrinter {
-  LinePrinter();
+  LinePrinter(bool out);
 
   bool is_smart_terminal() const { return smart_terminal_; }
   void set_smart_terminal(bool smart) { smart_terminal_ = smart; }
@@ -44,6 +45,10 @@ struct LinePrinter {
   void SetConsoleLocked(bool locked);
 
  private:
+  FILE * file() const { return out_ ? stdout : stderr; }
+
+  const bool out_;
+
   /// Whether we can do fancy terminal control codes.
   bool smart_terminal_;
 
@@ -51,7 +56,7 @@ struct LinePrinter {
   bool supports_color_;
 
   /// Whether the caret is at the beginning of a blank line.
-  bool have_blank_line_;
+  static bool have_blank_line_;
 
   /// Whether console is locked.
   bool console_locked_;

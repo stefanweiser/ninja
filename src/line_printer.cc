@@ -32,7 +32,9 @@
 
 using namespace std;
 
-LinePrinter::LinePrinter() : have_blank_line_(true), console_locked_(false) {
+bool LinePrinter::have_blank_line_ = true;
+
+LinePrinter::LinePrinter(bool out) : out_(out), console_locked_(false) {
   const char* term = getenv("TERM");
 #ifndef _WIN32
   smart_terminal_ = isatty(1) && term && string(term) != "dumb";
@@ -127,7 +129,7 @@ void LinePrinter::PrintOrBuffer(const char* data, size_t size) {
   } else {
     // Avoid printf and C strings, since the actual output might contain null
     // bytes like UTF-16 does (yuck).
-    fwrite(data, 1, size, stdout);
+    fwrite(data, 1, size, file());
   }
 }
 
@@ -139,6 +141,7 @@ void LinePrinter::PrintOnNewLine(const string& to_print) {
   }
   if (!have_blank_line_) {
     PrintOrBuffer("\n", 1);
+    have_blank_line_ = false;
   }
   if (!to_print.empty()) {
     PrintOrBuffer(&to_print[0], to_print.size());

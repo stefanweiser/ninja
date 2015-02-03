@@ -27,7 +27,7 @@ struct Status {
   virtual void PlanHasTotalEdges(int total) = 0;
   virtual void BuildEdgeStarted(const Edge* edge, int64_t start_time_millis) = 0;
   virtual void BuildEdgeFinished(Edge* edge, int64_t end_time_millis,
-                                 bool success, const std::string& output) = 0;
+                                 bool success, const std::string& output, const std::string& error) = 0;
   virtual void BuildLoadDyndeps() = 0;
   virtual void BuildStarted() = 0;
   virtual void BuildFinished() = 0;
@@ -46,7 +46,7 @@ struct StatusPrinter : Status {
   virtual void PlanHasTotalEdges(int total);
   virtual void BuildEdgeStarted(const Edge* edge, int64_t start_time_millis);
   virtual void BuildEdgeFinished(Edge* edge, int64_t end_time_millis,
-                                 bool success, const std::string& output);
+                                 bool success, const std::string& output, const std::string& error);
   virtual void BuildLoadDyndeps();
   virtual void BuildStarted();
   virtual void BuildFinished();
@@ -66,7 +66,8 @@ struct StatusPrinter : Status {
                                    int64_t time_millis) const;
 
  private:
-  void PrintStatus(const Edge* edge, int64_t time_millis);
+  void PrintOutput(const std::string& output, LinePrinter& printer);
+  void PrintStatus(const Edge* edge, int64_t time_millis, LinePrinter& printer);
 
   const BuildConfig& config_;
 
@@ -75,6 +76,7 @@ struct StatusPrinter : Status {
 
   /// Prints progress output.
   LinePrinter printer_;
+  LinePrinter err_printer_;
 
   /// The custom progress status format to use.
   const char* progress_status_format_;

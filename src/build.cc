@@ -501,6 +501,7 @@ bool RealCommandRunner::WaitForCommand(Result* result) {
 
   result->status = subproc->Finish();
   result->output = subproc->GetOutput();
+  result->error = subproc->GetError();
 
   map<const Subprocess*, Edge*>::iterator e = subproc_to_edge_.find(subproc);
   result->edge = e->second;
@@ -750,7 +751,9 @@ bool Builder::FinishCommand(CommandRunner::Result* result, string* err) {
         result->success()) {
       if (!result->output.empty())
         result->output.append("\n");
-      result->output.append(extract_err);
+      if (!result->error.empty())
+        result->error.append("\n");
+      result->error.append(extract_err);
       result->status = ExitFailure;
     }
   }
@@ -762,7 +765,7 @@ bool Builder::FinishCommand(CommandRunner::Result* result, string* err) {
   running_edges_.erase(it);
 
   status_->BuildEdgeFinished(edge, end_time_millis, result->success(),
-                             result->output);
+                             result->output, result->error);
 
   // The rest of this function only applies to successful commands.
   if (!result->success()) {
